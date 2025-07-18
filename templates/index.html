@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Visualization Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .filter {
+            margin-right: 10px;
+            margin-bottom: 5px;
+        }
+        .charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .chart-container {
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Visualization Dashboard</h1>
+
+    <div class="filters">
+        <div class="filter">
+            <label for="endYear">End Year:</label>
+            <select id="endYear" multiple></select>
+        </div>
+        <div class="filter">
+            <label for="topic">topic:</label>
+            <select id="topic" multiple></select>
+        </div>
+        <div class="filter">
+            <label for="sector">Sector:</label>
+            <select id="sector" multiple></select>
+        </div>
+        <div class="filter">
+            <label for="region">Region:</label>
+            <select id="region" multiple></select>
+        </div>
+        <div class="filter">
+            <label for="pest">PEST:</label>
+            <select id="pest" multiple></select>
+        </div>
+        <div class="filter">
+            <label for="source">Source:</label>
+            <select id="source" multiple></select>
+        </div>
+        <div class="filter">
+            <label for="country">Country:</label>
+            <select id="country" multiple></select>
+        </div>
+        <button onclick="applyFilters()">Apply Filters</button>
+    </div>
+
+    <div class="charts">
+        <div class="chart-container">
+            <canvas id="intensityChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="likelihoodChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="relevanceChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="yearChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="countryChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="topicChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="regionChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+    let data = [];
+let filteredData = [];
+let intensityChart, likelihoodChart, relevanceChart, yearChart, countryChart, topicChart, regionChart;
+
+async function fetchData() {
+    const response = await fetch('/api/data'); // Replace with your endpoint
+    data = await response.json();
+    filteredData = [...data];
+    populateFilters();
+    createCharts();
+}
+
+function populateFilters() {
+    const filters = ['topic', 'sector', 'region', 'pestle', 'source', 'country', 'endYear'];
+    filters.forEach(filter => {
+        const select = document.getElementById(filter.replace('pestle','pest'));
+        const uniqueValues = [...new Set(data.flatMap(item => item[filter] || (filter === 'pestle' ? item['pest'] : [])))];
+        if (filter === 'endYear') {
+            uniqueValues.sort((a, b) => a - b); // Sort years numerically
+        }
+        uniqueValues.forEach(value => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value;
+            select.appendChild(option);
+        });
+    });
+}
+
+function applyFilters() {
+    const endYear = Array.from(document.getElementById('endYear').selectedOptions).map(option => parseInt(option.value)); 
+    const topic = Array.from(document.getElementById('topic').selectedOptions).map(option => option.value);
+    const sector = Array.from(document.getElementById('sector').selectedOptions).map(option => option.value);
+    const region = Array.from(document.getElementById('region').selectedOptions).map(option => option.value);
+    const pest = Array.from(document.getElementById('pest').selectedOptions).map(option => option.value);
+    const source = Array.from(document.getElementById('source').selectedOptions).map(option => option.value);
+    const country = Array.from(document.getElementById('country').selectedOptions).map(option => option.value);
+
+    filteredData = data.filter(item => {
+        if (endYear.length && !endYear.includes(item.year)) return false;
+        if (topic.length && !topic.some(topic => item.topic && item.topic.includes(topic))) return false;
+        if (sector.length && !sector.some(sec => item.sector && item.sector.includes(sec))) return false;
+        if (region.length && !region.some(reg => item.region && item.region.includes(reg))) return false;
+        if (pest.length && !pest.some(p => item.pestle && item.pestle.includes(p))) return false;
+        if (source.length && !source.some(src => item.source && item.source.includes(src))) return false;
+        if (country.length && !country.some(c => item.country && item.country.includes(c))) return false;
+        return true;
+    });
+
+    updateCharts();
+}
+
+function createCharts() {
+    intensityChart = createBarChart('intensityChart', 'Intensity');
+    likelihoodChart = createBarChart('likelihoodChart', 'Likelihood');
+    relevanceChart = createBarChart('relevanceChart', 'Relevance');
+    yearChart = createBarChart('yearChart', 'Year');
+    countryChart = createBarChart('countryChart', 'Country');
+    topicChart = createBarChart('topicChart', 'topic');
+    regionChart = createBarChart('regionChart', 'Region');
+    updateCharts();
+}
+
+function createBarChart(canvasId, label) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    return new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: label,
+                data: [],
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function updateCharts() {
+    updateBarChart(intensityChart, 'intensity');
+    updateBarChart(likelihoodChart, 'likelihood');
+    updateBarChart(relevanceChart, 'relevance');
+    updateBarChart(yearChart, 'year');
+    updateBarChart(countryChart, 'country');
+    updateBarChart(topicChart, 'topic');
+    updateBarChart(regionChart, 'region');
+}
+
+function updateBarChart(chart, key) {
+    const counts = {};
+    filteredData.forEach(item => {
+        const value = item[key];
+        if (Array.isArray(value)) {
+            value.forEach(v => counts[v] = (counts[v] || 0) + 1);
+        } else if (value) {
+            counts[value] = (counts[value] || 0) + 1;
+        }
+    });
+
+    chart.data.labels = Object.keys(counts);
+    chart.data.datasets[0].data = Object.values(counts);
+    chart.update();
+}
+
+fetchData();
+</script>
+</body>
+</html>
